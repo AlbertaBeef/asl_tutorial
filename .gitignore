@@ -1,0 +1,4 @@
+model/*/*.xmodel
+model/*/md5sum.txt
+model/*/meta.json
+tf2_asl_classifier*.h5
