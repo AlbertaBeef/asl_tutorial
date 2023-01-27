@@ -1,3 +1,15 @@
+'''
+Copyright 2023 Avnet Inc.
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+'''
 #
 # ASL Classification (live with USB camera)
 #
@@ -47,16 +59,16 @@ def get_video_dev_by_name(src):
             if src in line:
                 return dev
 
-def detect_dpu_architecture():
-    proc = subprocess.run(['xdputil','query'], capture_output=True, encoding='utf8')
-    for line in proc.stdout.splitlines():
-        if 'DPU Arch' in line:
-            #                 "DPU Arch":"DPUCZDX8G_ISA0_B128_01000020E2012208",
-            #dpu_arch = re.search('DPUCZDX8G_ISA0_(.+?)_', line).group(1)  
-            #                 "DPU Arch":"DPUCZDX8G_ISA1_B2304",
-            #dpu_arch = re.search('DPUCZDX8G_ISA1_(.+?)', line).group(1)
-            dpu_arch = "B2304"
-            return dpu_arch
+# ...work in progress ...
+#def detect_dpu_architecture():
+#    proc = subprocess.run(['xdputil','query'], capture_output=True, encoding='utf8')
+#    for line in proc.stdout.splitlines():
+#        if 'DPU Arch' in line:
+#            #                 "DPU Arch":"DPUCZDX8G_ISA0_B128_01000020E2012208",
+#            #dpu_arch = re.search('DPUCZDX8G_ISA0_(.+?)_', line).group(1)  
+#            #                 "DPU Arch":"DPUCZDX8G_ISA1_B2304",
+#            #dpu_arch = re.search('DPUCZDX8G_ISA1_(.+?)', line).group(1)
+#            return dpu_arch
 
 # Parameters (tweaked for video)
 scale = 1.0
@@ -76,7 +88,10 @@ print(dev_media)
 input_video = dev_video  
 print("[INFO] Input Video : ",input_video)
 
-displayReference = True
+output_dir = './captured-images'
+
+if not os.path.exists(output_dir):      
+    os.mkdir(output_dir)            # Create the output directory if it doesn't already exist
 
 cv2.namedWindow('ASL Classification')
 
@@ -158,11 +173,22 @@ def TopK(datain, size, filePath):
                 print("Top[%d] %d %s" % (i, idx, (line.strip)("\n")))
             idx = idx + 1
 
-dpu_arch = detect_dpu_architecture()
-print('[INFO] Detected DPU architecture : ',dpu_arch)
+# construct the argument parser and parse the arguments
+ap = argparse.ArgumentParser()  
+ap.add_argument('-m', '--model',     type=str, default='asl_classifier.xmodel', help='Path of xmodel. Default is asl_classifier.xmodel')
 
-model_path = './model_1/'+dpu_arch+'/asl_classifier_1.xmodel'
-print('[INFO] ASL model : ',model_path)
+args = ap.parse_args()  
+  
+print ('Command line options:')
+print (' --model     : ', args.model)
+
+#dpu_arch = detect_dpu_architecture()
+#print('[INFO] Detected DPU architecture : ',dpu_arch)
+#
+#model_path = './model_1/'+dpu_arch+'/asl_classifier_1.xmodel'
+#print('[INFO] ASL model : ',model_path)
+model_path = args.model
+
 
 # Create DPU runner
 g = xir.Graph.deserialize(model_path)
@@ -255,11 +281,26 @@ while True:
             output = image.copy()
             
             asl_id = -1
-            #try:
-            if True:
+            try:
+                # 448x448 ROI for classification
+                #y1 = (16)
+                #y2 = (16+448)
+                #x1 = (96)
+                #x2 = (96+448)
+                #roi_img = output[ y1:y2, x1:x2, : ]
+                #roi_img = cv2.resize(asl_img,(224,224),interpolation=cv2.INTER_CUBIC)
+            
+                # 224x224 ROI for classification
+                y1 = (128)
+                y2 = (128+224)
+                x1 = (208)
+                x2 = (208+224)
+                roi_img = output[ y1:y2, x1:x2, : ]
+                
+                cv2.rectangle(output, (x1,y1), (x2,y2), (0, 255, 0), 2)
+
                 # ASL pre-processing
-                asl_img = cv2.resize(image,(224,224),interpolation=cv2.INTER_CUBIC)
-                asl_img = cv2.cvtColor(asl_img, cv2.COLOR_BGR2RGB)
+                asl_img = cv2.cvtColor(roi_img, cv2.COLOR_BGR2RGB)
                 asl_img = asl_img*input_scale
                 asl_img = asl_img.astype(np.int8)
                 #cv2.imshow('asl_img',asl_img)
@@ -298,8 +339,8 @@ while True:
                 asl_text = '['+str(asl_id)+']='+asl_sign
                 cv2.putText(output,asl_text,(10,30),text_fontType,text_fontSize,text_color,text_lineSize,text_lineType)
                         
-            #except:
-            #    print("ERROR : Exception occured during ASL classification ...")
+            except:
+                print("ERROR : Exception occured during ASL classification ...")
 
                          
             matching_text = ("[%04d] [%02d]=%s"%(frame_count,asl_id,asl_sign))
@@ -325,7 +366,7 @@ while True:
         filename = ("frame%04d_asl%02d.tif"%(frame_count,asl_id))
             
         print("Capturing ",filename," ...")
-        cv2.imwrite(os.path.join(output_dir,filename),asl_img)
+        cv2.imwrite(os.path.join(output_dir,filename),roi_img)
        
     if key == 115: # 's'
         step = True    
@@ -337,7 +378,7 @@ while True:
         step = False
         pause = False
 
-    if key == 27:
+    if key == 27 or key == 113: # ESC or 'q':
         break
 
     # Update the real-time FPS counter
