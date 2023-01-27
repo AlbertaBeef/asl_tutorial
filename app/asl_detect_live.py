@@ -92,7 +92,7 @@ cap.set(cv2.CAP_PROP_FRAME_HEIGHT,frame_height)
 print("camera",input_video," (",frame_width,",",frame_height,")")
 
 # Open ASL model
-#model = load_model('tf2_asl_classifier.h5')
+#model = load_model('tf2_asl_classifier_1.h5')
 
 # Vitis-AI implementation of ASL model
 
@@ -161,7 +161,7 @@ def TopK(datain, size, filePath):
 dpu_arch = detect_dpu_architecture()
 print('[INFO] Detected DPU architecture : ',dpu_arch)
 
-model_path = './model/'+dpu_arch+'/asl_classifier.xmodel'
+model_path = './model_1/'+dpu_arch+'/asl_classifier_1.xmodel'
 print('[INFO] ASL model : ',model_path)
 
 # Create DPU runner
@@ -205,6 +205,38 @@ rt_fps = 0.0
 rt_fps_message = "FPS: {0:.2f}".format(rt_fps)
 rt_fps_x = int(10*scale)
 rt_fps_y = int((frame_height-10)*scale)
+
+id_to_class = {
+  0 :"A",
+  1 :"B",
+  2 :"C",
+  3 :"D",
+  4 :"E",
+  5 :"F",
+  6 :"G",
+  7 :"H",
+  8 :"I",
+  9 :"J",
+  10:"K",
+  11:"L",
+  12:"M",
+  13:"N",
+  14:"O",
+  15:"P",
+  16:"Q",
+  17:"R",
+  18:"S",
+  19:"T",
+  20:"U",
+  21:"V",
+  22:"W",
+  23:"X",
+  24:"Y",
+  25:"Z",
+  26:"{del}",
+  27:"{nothing}",
+  28:"{space}"
+  }
     
 while True:
     # init the real-time FPS counter
@@ -239,36 +271,38 @@ while True:
                 #asl_y = model.predict(asl_x)
 
                 """ Prepare input/output buffers """
-                print("[INFO] ASL - prep input buffer ")
+                #print("[INFO] ASL - prep input buffer ")
                 inputData = []
                 inputData.append(np.empty((inputShape),dtype=np.int8,order='C'))
                 inputImage = inputData[0]
                 inputImage[0,...] = asl_img
 
-                print("[INFO] ASL - prep output buffer ")
+                #print("[INFO] ASL - prep output buffer ")
                 outputData = []
                 outputData.append(np.empty((outputShape),dtype=np.int8,order='C'))
 
                 """ Execute model on DPU """
-                print("[INFO] ASL - execute ")
+                #print("[INFO] ASL - execute ")
                 job_id = dpu.execute_async( inputData, outputData )
                 dpu.wait(job_id)
 
                 # ASL post-processing
-                print("[INFO] ASL - post-processing ")
-                print(outputData[0].shape)
+                #print("[INFO] ASL - post-processing ")
+                #print(outputData[0].shape)
                 OutputData = outputData[0].reshape(1,29)
                 asl_y = np.reshape( OutputData, (-1,29) )
                 asl_id  = np.argmax(asl_y[0])
+                asl_sign = id_to_class[asl_id]
 
-                print("[INFO] ASL - done ")
-                cv2.putText(output,str(asl_id),(10,10),text_fontType,text_fontSize,text_color,text_lineSize,text_lineType)
+                #print("[INFO] ASL - done ")
+                asl_text = '['+str(asl_id)+']='+asl_sign
+                cv2.putText(output,asl_text,(10,30),text_fontType,text_fontSize,text_color,text_lineSize,text_lineType)
                         
             #except:
             #    print("ERROR : Exception occured during ASL classification ...")
 
                          
-            matching_text = ("[%04d] %02d"%(frame_count,asl_id))
+            matching_text = ("[%04d] [%02d]=%s"%(frame_count,asl_id,asl_sign))
             print(matching_text)
                 
             # display real-time FPS counter (if valid)
