@@ -26,7 +26,14 @@ import argparse
 
 divider = '------------------------------------'
 
+global bIsVgg16Model
+global bIsMobileNetV2Model
+bIsVgg16Model = False
+bIsMobileNetV2Model = False
+
 def preprocess_fn(image_path, fix_scale):
+    global bIsVgg16Model
+    global bIsMobileNetV2Model
     '''
     Image pre-processing.
     Rearranges from BGR to RGB then normalizes to range 0:1
@@ -34,10 +41,19 @@ def preprocess_fn(image_path, fix_scale):
     input arg: path of image file
     return: numpy array
     '''
+
+    #print("[INFO] Performing pre-processing for ",image_path)
     image = cv2.imread(image_path)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    image = image * fix_scale
-    image = image.astype(np.int8)
+
+    if bIsVgg16Model == True:
+      #print("[INFO] Performing pre-processing for VGG16 model ... ")
+      image = image * fix_scale
+      image = image.astype(np.int8)
+    if bIsMobileNetV2Model == True:
+      #print("[INFO] Performing pre-processing for MobileNetV2 model ... ")
+      image = image / 255.0
+
     return image
 
 
@@ -57,6 +73,8 @@ def get_child_subgraph_dpu(graph: "Graph") -> List["Subgraph"]:
 
 
 def runDPU(id,start,dpu,img):
+    global bIsVgg16Model
+    global bIsMobileNetV2Model
     '''get tensor'''
     inputTensors = dpu.get_input_tensors()
     outputTensors = dpu.get_output_tensors()
@@ -84,7 +102,10 @@ def runDPU(id,start,dpu,img):
 
         '''prepare batch input/output '''
         inputData = []
-        inputData = [np.empty(input_ndim, dtype=np.int8, order="C")]
+        if bIsVgg16Model == True:
+          inputData = [np.empty(input_ndim, dtype=np.int8, order="C")]
+        if bIsMobileNetV2Model == True:
+          inputData = [np.empty(input_ndim, dtype=np.float32, order="C")]
 
         '''init input image to input buffer '''
         for j in range(runSize):
@@ -113,6 +134,17 @@ def app(image_dir,threads,model):
 
     listimage=os.listdir(image_dir)
     runTotal = len(listimage)
+    
+    global bIsVgg16Model
+    global bIsMobileNetV2Model
+    bIsVgg16Model = False
+    bIsMobileNetV2Model = False
+    if model.find("vgg16") >= 0:
+      print("[INFO] Detected VGG16 model : ",model)
+      bIsVgg16Model = True
+    elif model.find("mobilenetv2") >= 0:
+      print("[INFO] Detected MobilenetV2 model : ",model)
+      bIsMobileNetV2Model = True
 
     global out_q
     out_q = [None] * runTotal

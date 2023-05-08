@@ -11,7 +11,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 '''
 #
-# ASL Classification (live with USB camera)
+# ASL Classification (live with DualCam HSIO)
 #
 # References:
 #   https://www.github.com/AlbertaBeef/asl_tutorial/tree/2022.2
@@ -42,6 +42,8 @@ import argparse
 import glob
 import subprocess
 import re
+
+from avnet_dualcam.dualcam import DualCam
 
 def get_media_dev_by_name(src):
     devices = glob.glob("/dev/media*")
@@ -78,15 +80,15 @@ text_color    = (0,0,255)
 text_lineSize = max( 1, int(2*scale) )
 text_lineType = cv2.LINE_AA
 
-print("[INFO] Searching for USB camera ...")
-dev_video = get_video_dev_by_name("uvcvideo")
-dev_media = get_media_dev_by_name("uvcvideo")
-print(dev_video)
-print(dev_media)
+#print("[INFO] Searching for USB camera ...")
+#dev_video = get_video_dev_by_name("uvcvideo")
+#dev_media = get_media_dev_by_name("uvcvideo")
+#print(dev_video)
+#print(dev_media)
 
 #input_video = 0 
-input_video = dev_video  
-print("[INFO] Input Video : ",input_video)
+#input_video = dev_video  
+#print("[INFO] Input Video : ",input_video)
 
 output_dir = './captured-images'
 
@@ -97,14 +99,20 @@ cv2.namedWindow('ASL Classification')
 
 
 # Open video
-cap = cv2.VideoCapture(input_video)
+#cap = cv2.VideoCapture(input_video)
+#frame_width = 640
+#frame_height = 480
+#cap.set(cv2.CAP_PROP_FRAME_WIDTH,frame_width)
+#cap.set(cv2.CAP_PROP_FRAME_HEIGHT,frame_height)
+#print("camera",input_video," (",frame_width,",",frame_height,")")
+
+# Initialize the capture pipeline
+print("[INFO] Initializing the capture pipeline ...")
 frame_width = 640
 frame_height = 480
-cap.set(cv2.CAP_PROP_FRAME_WIDTH,frame_width)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT,frame_height)
-#frame_width = int(round(cap.get(cv2.CAP_PROP_FRAME_WIDTH)))
-#frame_height = int(round(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-print("camera",input_video," (",frame_width,",",frame_height,")")
+dualcam = DualCam('ar0144','primary',frame_width,frame_height)
+#dualcam.set_brightness(brightness)  
+
 
 # Open ASL model
 #model = load_model('tf2_asl_classifier_1.h5')
@@ -281,11 +289,13 @@ while True:
     #if cap.grab():
     if True:
         frame_count = frame_count + 1
-        #flag, image = cap.retrieve()
-        flag, image = cap.read()
-        if not flag:
-            break
-        else:
+        #flag, image = cap.read()
+        #if not flag:
+        #    break
+        #else:
+        if True:
+            image = dualcam.capture()
+
             #image = cv2.resize(image,(0,0), fx=scale, fy=scale) 
             output = image.copy()
             
@@ -339,12 +349,10 @@ while True:
                   inputData.append(np.empty((inputShape),dtype=np.float32,order='C'))
                   inputImage = inputData[0]
                   inputImage[0,...] = asl_img
-                               
 
                 #print("[INFO] ASL - prep output buffer ")
                 outputData = []
                 outputData.append(np.empty((outputShape),dtype=np.int8,order='C'))
-                #outputData.append(np.empty((outputShape),dtype=np.float32,order='C'))
 
                 # ASL model execution
                 #asl_y = model.predict(asl_x)
