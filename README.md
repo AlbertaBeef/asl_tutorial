@@ -2,6 +2,9 @@
 Tutorials based on the ASL (American Sign Language) dataset:
 https://www.kaggle.com/datasets/grassknoted/asl-alphabet
 
+# Demo
+! [](avnet-zub1cg-2022.2-asl_classify_dualcam.gif)
+
 # Webinar
 For more information on how the ASL classification demo was created, 
 please view the following webinar which provides a detailed description:
